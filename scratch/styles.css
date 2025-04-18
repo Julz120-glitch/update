@@ -1,0 +1,40 @@
+body{
+    font-family: Verdana, Geneva, Tahoma, sans-serif;
+    background-color: lavender;
+    color: rgb(45, 25, 86);
+    background-image: url(https://www.jacksonandperkins.com/images/xxl/29539-PK-3.jpg);
+    background-repeat: no-repeat;
+    background-size: cover;
+a{
+    color: rgb(39, 1, 101);
+}
+h1, h2{
+    text-align: center;
+}
+img{
+    border: 5px solid rgb(255, 255, 163);
+    padding: 5px;
+    height: 500px;
+    /* margin: auto;
+    display: block; */
+}
+.rizz{
+    font-family:'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif;
+    color: rgb(56, 19, 92);
+    border: 5px dashed orange;
+    font-size: 400%;
+    font-weight: bolder;
+    background-color: darkgoldenrod;
+}
+.rizz:hover{
+    font-size: 450px;
+    color: aquamarine;
+    border: 5px solid burlywood
+}
+li{
+    width:fit-content
+}
+li:hover{
+    text-decoration: underline;
+    background-color: green;
+}

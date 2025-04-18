@@ -1,0 +1,13 @@
+body{
+    font-family: 'Times New Roman', Times, serif;
+    background-color: rgb(218, 250, 220);
+}
+h1, h2, h3, .subheading{
+    font-family: 'Times New Roman', Times, serif !important;
+}
+h2:hover, h3:hover{
+    color: rgb(19, 208, 255);
+}
+.experiencebg{
+    background-image: url('https://t4.ftcdn.net/jpg/06/54/26/05/360_F_654260545_Cw4e30ZpzeTqCXNXGq1rykDnFi984Aui.jpg');
+}

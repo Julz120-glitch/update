@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cosmo's Campus Dash - Horizontal</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #002255; /* BYU Navy */
+            margin: 0;
+            font-family: 'Press Start 2P', cursive;
+            color: white;
+            flex-direction: column; /* Stack elements vertically */
+        }
+        #game-container {
+            border: 5px solid white;
+            position: relative; /* Needed for absolute positioning of game over message */
+            background-color: #f0f0f0; /* Light grey background for contrast */
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
+            border-radius: 10px; /* Rounded corners */
+            overflow: hidden; /* Hide anything outside the canvas */
+        }
+        canvas {
+            display: block; /* Remove extra space below canvas */
+            background: linear-gradient(to bottom, #87CEEB 60%, #77dd77 40%); /* Sky blue top, Green grass bottom */
+        }
+        #score-board {
+            margin-bottom: 10px; /* Adjusted margin */
+            font-size: 1.5em;
+            text-shadow: 2px 2px #333;
+        }
+         #instructions {
+            margin-bottom: 15px; /* Adjusted margin */
+            font-size: 0.8em;
+            color: #ccc;
+         }
+        #game-over-message {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 34, 85, 0.85); /* Semi-transparent BYU Navy */
+            color: white;
+            padding: 40px;
+            border-radius: 15px;
+            text-align: center;
+            display: none; /* Hidden by default */
+            font-size: 1.5em;
+            border: 3px solid white;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+            z-index: 10; /* Ensure it's above canvas elements */
+        }
+        #game-over-message h2 {
+            margin-bottom: 10px;
+            font-size: 1.2em;
+        }
+         #game-over-message p {
+            margin-bottom: 20px;
+            font-size: 1em;
+         }
+        #restart-button {
+            padding: 15px 25px;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 1em;
+            color: #002255; /* BYU Navy */
+            background-color: white;
+            border: 2px solid #002255;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.3s, color 0.3s;
+            box-shadow: 0 4px #999;
+        }
+        #restart-button:hover {
+            background-color: #eee;
+        }
+         #restart-button:active {
+             background-color: #ddd;
+             box-shadow: 0 2px #666;
+             transform: translateY(2px);
+         }
+    </style>
+</head>
+<body>
+    
+    <p> <a href="youtube.html" target="_blank" title="Rory takes the W">Masters</a> </p>
+    <div id="score-board">Score: 0</div>
+    <div id="instructions">Arrows: Switch Lanes | Space: Jump | Avoid Red People!</div> <div id="game-container">
+        <canvas id="gameCanvas" width="800" height="400"></canvas>
+        <div id="game-over-message">
+            <h2>GAME OVER!</h2>
+            <p id="final-score">Your Score: 0</p>
+            <button id="restart-button">Restart</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreBoard = document.getElementById('score-board');
+        const gameOverMessage = document.getElementById('game-over-message');
+        const finalScoreDisplay = document.getElementById('final-score');
+        const restartButton = document.getElementById('restart-button');
+
+        // --- Game Constants ---
+        const PLAYER_FIXED_X = 100; // Player's horizontal position
+        const PLAYER_WIDTH = 50;
+        const PLAYER_HEIGHT = 40;
+        const PLAYER_COLOR_BODY = '#0033A0'; // BYU Royal Blue
+        const PLAYER_COLOR_FACE = '#FFFFFF';
+        const PLAYER_COLOR_NOSE = '#000000';
+        // Lanes are Y-coordinates for the player's baseline
+        const LANES = [canvas.height * 0.8 - PLAYER_HEIGHT, canvas.height * 0.6 - PLAYER_HEIGHT, canvas.height * 0.4 - PLAYER_HEIGHT];
+        // Obstacle constants updated for "people"
+        const OBSTACLE_WIDTH = 30; // Thinner for people
+        const OBSTACLE_HEIGHT = 60; // Taller for people
+        const PERSON_COLOR = '#FF0000'; // Red color for obstacles
+        const JUMP_VELOCITY = 15;
+        const GRAVITY = 0.8;
+
+        // --- Game State Variables ---
+        let playerLane = 0; // 0 (bottom), 1 (middle), 2 (top)
+        let playerY;
+        let playerBaseY;
+        let playerVelocityY = 0;
+        let isJumping = false;
+        let obstacles = [];
+        let backgroundElements = [];
+        let score = 0;
+        let gameSpeed = 4; // Initial speed
+        let frames = 0;
+        let gameOver = false;
+        let animationFrameId;
+
+        // --- Player Object ---
+        const player = {
+            x: PLAYER_FIXED_X,
+            get y() { return playerY; },
+            width: PLAYER_WIDTH,
+            height: PLAYER_HEIGHT
+        };
+
+         // --- Background Element Class ---
+         class BackgroundElement {
+            constructor(y, height, speedMultiplier, color) {
+                this.x = canvas.width + Math.random() * canvas.width;
+                this.y = y;
+                this.width = Math.random() * 50 + 20;
+                this.height = height;
+                this.speedMultiplier = speedMultiplier;
+                this.color = color;
+            }
+            update() {
+                this.x -= gameSpeed * this.speedMultiplier;
+                if (this.x + this.width < 0) {
+                    this.x = canvas.width + Math.random() * 50;
+                    this.width = Math.random() * 50 + 20;
+                }
+            }
+            draw() {
+                ctx.fillStyle = this.color;
+                ctx.fillRect(this.x, this.y, this.width, this.height);
+            }
+        }
+
+
+        // --- Obstacle Class (Updated for Red People) ---
+        class Obstacle {
+            constructor(lane) {
+                this.lane = lane;
+                this.x = canvas.width; // Start at the right edge
+                this.width = OBSTACLE_WIDTH;
+                this.height = OBSTACLE_HEIGHT;
+                // Position obstacle on the ground of the chosen lane using the new height
+                this.y = LANES[lane] + PLAYER_HEIGHT - this.height;
+                this.color = PERSON_COLOR; // Obstacles are always red people now
+            }
+
+            draw() {
+                // Simple person shape: rectangle body, circle head
+                const headRadius = this.width / 2;
+                const bodyHeight = this.height - headRadius * 1.5; // Adjust body height relative to head
+
+                // Body
+                ctx.fillStyle = this.color;
+                ctx.fillRect(this.x, this.y + headRadius * 1.5, this.width, bodyHeight);
+
+                // Head
+                ctx.beginPath();
+                ctx.arc(this.x + this.width / 2, this.y + headRadius, headRadius, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            update() {
+                this.x -= gameSpeed; // Move obstacle left
+            }
+        }
+
+        // --- Game Functions ---
+
+        function initializeBackground() {
+            backgroundElements = [];
+            // Simple distant buildings (slow scroll)
+            for (let i = 0; i < 5; i++) {
+                backgroundElements.push(new BackgroundElement(canvas.height * 0.6 - 100, 100, 0.2, '#A9A9A9')); // Dark grey buildings
+            }
+             // Closer ground lines (faster scroll)
+             for (let i = 0; i < 10; i++) {
+                backgroundElements.push(new BackgroundElement(canvas.height * 0.6 + Math.random() * (canvas.height*0.4), 2, 0.8, '#556B2F')); // Dark Olive Green lines
+            }
+        }
+
+        function updateBackground() {
+            backgroundElements.forEach(el => el.update());
+        }
+
+        function drawBackground() {
+            backgroundElements.forEach(el => el.draw());
+        }
+
+
+        function spawnObstacle() {
+            // Spawn rate adjusted slightly
+            const spawnRate = Math.max(140 - Math.floor(gameSpeed * 6), 50); // Faster spawn increase, capped lower
+            if (frames % spawnRate === 0) {
+                const lane = Math.floor(Math.random() * LANES.length);
+                let canSpawn = true;
+                for(let obs of obstacles) {
+                    // Check wider area to prevent impossible clumps
+                    if(obs.lane === lane && obs.x > canvas.width - OBSTACLE_WIDTH * 5) {
+                        canSpawn = false;
+                        break;
+                    }
+                }
+                if(canSpawn) {
+                    obstacles.push(new Obstacle(lane));
+                }
+            }
+        }
+
+        function updateObstacles() {
+            for (let i = obstacles.length - 1; i >= 0; i--) {
+                obstacles[i].update();
+                if (obstacles[i].x + obstacles[i].width < 0) {
+                    obstacles.splice(i, 1);
+                }
+            }
+        }
+
+        // Function to draw the cougar (no changes here)
+        function drawPlayer() {
+             const x = player.x;
+            const y = player.y;
+            const w = player.width;
+            const h = player.height;
+
+            // Body
+            ctx.fillStyle = PLAYER_COLOR_BODY;
+            ctx.beginPath();
+            ctx.moveTo(x, y + h * 0.5); // Start back middle
+            ctx.lineTo(x + w * 0.2, y); // Top of back
+            ctx.lineTo(x + w * 0.7, y); // Top of head
+            ctx.lineTo(x + w * 0.9, y + h * 0.3); // Nose area top
+            ctx.lineTo(x + w, y + h * 0.5); // Nose tip
+            ctx.lineTo(x + w * 0.9, y + h * 0.7); // Nose area bottom
+            ctx.lineTo(x + w * 0.6, y + h); // Front leg top
+            ctx.lineTo(x + w * 0.5, y + h); // Back leg top
+            ctx.closePath();
+            ctx.fill();
+
+            // Face Details
+            ctx.fillStyle = PLAYER_COLOR_FACE;
+            ctx.beginPath();
+            ctx.arc(x + w * 0.8, y + h * 0.35, w * 0.15, 0, Math.PI * 2); // Eye
+            ctx.fill();
+            ctx.fillStyle = PLAYER_COLOR_NOSE; // Pupil
+            ctx.beginPath();
+            ctx.arc(x + w * 0.85, y + h * 0.35, w * 0.07, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Nose
+             ctx.fillStyle = PLAYER_COLOR_NOSE;
+             ctx.beginPath();
+             ctx.moveTo(x + w * 0.95, y + h * 0.45);
+             ctx.lineTo(x + w, y + h * 0.5);
+             ctx.lineTo(x + w * 0.95, y + h * 0.55);
+             ctx.closePath();
+             ctx.fill();
+
+             // Simple Tail
+             if (playerY > playerBaseY - h * 0.5) {
+                 ctx.strokeStyle = PLAYER_COLOR_BODY;
+                 ctx.lineWidth = 6;
+                 ctx.beginPath();
+                 ctx.moveTo(x, y + h * 0.6);
+                 ctx.bezierCurveTo(x - w * 0.4, y + h * 0.4, x - w * 0.5, y + h * 0.8, x - w * 0.3, y + h);
+                 ctx.stroke();
+             }
+        }
+
+
+        function drawObstacles() {
+            obstacles.forEach(obstacle => obstacle.draw());
+        }
+
+        function drawLanes() {
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([10, 10]);
+            LANES.forEach(laneY => {
+                const groundY = laneY + PLAYER_HEIGHT;
+                ctx.beginPath();
+                ctx.moveTo(0, groundY);
+                ctx.lineTo(canvas.width, groundY);
+                ctx.stroke();
+            });
+             ctx.setLineDash([]);
+        }
+
+        function updatePlayer() {
+            playerBaseY = LANES[playerLane];
+            if (isJumping) {
+                playerY -= playerVelocityY;
+                playerVelocityY -= GRAVITY;
+                if (playerY >= playerBaseY) {
+                    playerY = playerBaseY;
+                    playerVelocityY = 0;
+                    isJumping = false;
+                }
+            } else {
+                playerY = playerBaseY;
+            }
+        }
+
+
+        function checkCollisions() {
+            for (let obstacle of obstacles) {
+                // Check if obstacle is in the same lane (Y-level) as the player's base
+                if (Math.abs((obstacle.y + obstacle.height) - (playerBaseY + player.height)) < 10) {
+                    // Check for horizontal overlap
+                    if (
+                        player.x < obstacle.x + obstacle.width &&
+                        player.x + player.width > obstacle.x
+                    ) {
+                        // Check vertical overlap, considering jump
+                        if (player.y < obstacle.y + obstacle.height &&
+                            player.y + player.height > obstacle.y) {
+                             console.log("Collision!");
+                             return true;
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+
+
+        function updateScore() {
+            score += Math.floor(gameSpeed / 4);
+            scoreBoard.textContent = `Score: ${score}`;
+        }
+
+        // --- Updated increaseSpeed function ---
+        function increaseSpeed() {
+            // Increase speed more frequently and slightly more amount
+            // (e.g., every 4 seconds at 60fps)
+            if (frames % 240 === 0 && gameSpeed < 15) { // Check every 240 frames, cap speed at 15
+                gameSpeed += 0.4; // Increase speed by 0.4
+                console.log("Speed Increased:", gameSpeed.toFixed(1)); // Log speed with one decimal place
+            }
+        }
+
+        function handleGameOver() {
+            gameOver = true;
+            cancelAnimationFrame(animationFrameId);
+            finalScoreDisplay.textContent = `Your Score: ${score}`;
+            gameOverMessage.style.display = 'block';
+             console.log("Game Over! Final Score:", score);
+        }
+
+        function resetGame() {
+            playerLane = 0;
+            playerBaseY = LANES[playerLane];
+            playerY = playerBaseY;
+            playerVelocityY = 0;
+            isJumping = false;
+            obstacles = [];
+            backgroundElements = [];
+            initializeBackground();
+            score = 0;
+            gameSpeed = 4; // Reset speed
+            frames = 0;
+            gameOver = false;
+            scoreBoard.textContent = `Score: 0`;
+            gameOverMessage.style.display = 'none';
+             console.log("Restarting game...");
+            gameLoop();
+        }
+
+        // --- Game Loop ---
+        function gameLoop() {
+            if (gameOver) return;
+
+            // 1. Clear Canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 2. Update Game State
+            frames++;
+            updateBackground();
+            updatePlayer();
+            spawnObstacle();
+            updateObstacles();
+            updateScore();
+            increaseSpeed(); // Calls the updated function
+
+            // 3. Draw Elements
+            drawBackground();
+            drawLanes();
+            drawObstacles(); // Draws the new red person obstacles
+            drawPlayer();
+
+            // 4. Check for Collisions
+            if (checkCollisions()) {
+                handleGameOver();
+                return;
+            }
+
+            // 5. Request Next Frame
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        // --- Event Listeners ---
+        function handleKeyDown(e) {
+             if (gameOver) return;
+            switch (e.code) {
+                 case 'ArrowUp':
+                    if (playerLane < LANES.length - 1) {
+                        playerLane++;
+                        if (!isJumping) playerY = LANES[playerLane];
+                    }
+                    break;
+                case 'ArrowDown':
+                     if (playerLane > 0) {
+                        playerLane--;
+                         if (!isJumping) playerY = LANES[playerLane];
+                    }
+                    break;
+                case 'Space':
+                    if (!isJumping) {
+                        isJumping = true;
+                        playerVelocityY = JUMP_VELOCITY;
+                    }
+                    break;
+            }
+        }
+
+        document.addEventListener('keydown', handleKeyDown);
+        restartButton.addEventListener('click', resetGame);
+
+        // --- Start Game ---
+         window.onload = () => {
+             console.log("Game starting...");
+             initializeBackground();
+             playerBaseY = LANES[playerLane];
+             playerY = playerBaseY;
+             gameLoop();
+         };
+
+    </script>
+</body>
+</html>
